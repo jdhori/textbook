@@ -42,26 +42,9 @@ python check-video-accessibility.py _build/html
 
 import sys
 import os
-import threading
-import http.server
-import socketserver
-import urllib.parse
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
-
-def start_server(directory, port=8000):
-    class Handler(http.server.SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=directory, **kwargs)
-        def log_message(self, format, *args):
-            pass # Suppress logging
-    httpd = socketserver.TCPServer(("", port), Handler)
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
-    return httpd
-
 VIDEO_DOMAINS = [
     "youtube.com",
     "youtu.be",
@@ -232,23 +215,10 @@ def main():
     all_errors = []
     all_warnings = []
 
-    # Start a local HTTP server on port 8000
-    start_server(str(root), port=8000)
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-
-        for file in root.rglob("*.html"):
-            try:
-                rel_path = file.relative_to(root).as_posix()
-                url = f"http://localhost:8000/{urllib.parse.quote(rel_path)}"
-                page.goto(url)
-                page.wait_for_load_state("networkidle", timeout=3000)
-            except Exception:
-                pass
-                
-            html = page.content()
+    for file in root.rglob("*.html"):
+        try:
+            with open(file, "r", encoding="utf-8") as f:
+                html = f.read()
             soup = BeautifulSoup(html, "lxml")
 
             for iframe in soup.find_all("iframe"):
@@ -260,8 +230,8 @@ def main():
                 e, w = check_video(file.name, video)
                 all_errors.extend(e)
                 all_warnings.extend(w)
-                
-        browser.close()
+        except Exception as ex:
+            annotate_warning(f"Failed to read or parse {file.name}: {ex}")
 
     for e in all_errors:
         annotate_error(e)

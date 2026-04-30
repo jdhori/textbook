@@ -31,8 +31,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
-          pip install beautifulsoup4 lxml playwright
-          playwright install chromium --with-deps
+          pip install beautifulsoup4 lxml
 
       # 4. Build the Jupyter Book HTML
       - name: Build Jupyter Book
